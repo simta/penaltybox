@@ -1,0 +1,7 @@
+
+redact umich.edu domain specific bits
+move userthrottle scripts to ... somewhere
+make this a separate CVS tree
+consider autoconf for build (inherent from simta build)
+
+
