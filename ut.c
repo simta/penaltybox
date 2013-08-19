@@ -7,31 +7,183 @@
  *
  */
 
-#include "simta_mysql.h"
+#include <inttypes.h>
+#include <libgen.h>
+#include <string.h>
+#include <strings.h>
 #include <sys/utsname.h>
 
-main( int ac, char *av[] )
+#include "simta_mysql.h"
+
+int update_user( MYSQL mysql, char *uniqname, intmax_t threshold ) {
+    char    query[ 1024 ];
+    int len, rc;
+
+    len = snprintf( query, sizeof( query ),
+        "INSERT INTO `user_config` (`uniqname`, `threshold`) VALUES ('%s', %jd) ON DUPLICATE KEY UPDATE `threshold` = %jd",
+        uniqname, threshold, threshold );
+
+    if ( len >= sizeof( query )) {
+        fprintf( stderr, "INSERT too long! %d\n", len );
+        return 1;
+    }
+
+    if (( rc = mysql_real_query( &mysql, query, len )) != 0 ) {
+        printf( "SPL record insert failed: <%s> <%jd>\n",
+            uniqname, threshold );
+        return 1;
+    }
+
+    return 0;
+}
+
+int userthrottle( MYSQL mysql )
+{
+    MYSQL_RES   *result;
+    MYSQL_ROW   row;
+    char        *uniqname, *chksum, *host;
+    char        query[ 1024 ];
+    intmax_t    nrcpts, count, threshold;
+    int         len, rc, retval = MESSAGE_ACCEPT;
+    struct utsname *ub;
+    
+    if (( chksum = getenv( "SIMTA_CHECKSUM" )) == NULL ) {
+	fprintf( stderr, "SIMTA_CHECKSUM not set\n" );
+	return( retval );
+    }
+
+    if (( uniqname = getenv( "SIMTA_AUTH_ID" )) == NULL ) {
+	fprintf( stderr, "SIMTA_AUTH_ID not set\n" );
+	return( retval );
+    }
+
+    if ( getenv( "SIMTA_NRCPTS" ) == NULL ) {
+	fprintf( stderr, "SIMTA_NRCPTS not set\n" );
+	return( retval );
+    }
+
+    nrcpts = strtoimax( getenv( "SIMTA_NRCPTS" ), NULL, 10 );
+
+    if ( ! ( ub = malloc( sizeof( struct utsname ) ) ) ) {
+	fprintf( stderr, "malloc fail\n" );
+	return( retval );
+    }
+
+    rc = uname( ub );
+
+    if (( rc = uname( ub ))) {
+	fprintf( stderr, "uname fail %d\n", rc );
+	exit( retval );
+    }
+
+    host = ub->nodename;
+
+    len = snprintf( query, sizeof( query ),
+            "SELECT `threshold` FROM `user_config` WHERE `uniqname` = '%s' AND `enabled` = 1",
+            uniqname );
+
+    if ( len >= sizeof( query )) {
+        fprintf( stderr, "SELECT too long! %d\n", len );
+        return( retval );
+    }
+
+    if (( rc = mysql_real_query( &mysql, query, len )) != 0 ) {
+        fprintf( stderr, "SELECT failed: %s\n", mysql_error( &mysql ));
+        return( retval );
+    }
+
+    if (( result = mysql_store_result( &mysql )) == NULL ) {
+        fprintf( stderr, "mysql_store_result failed: %s\n",
+            mysql_error( &mysql ));
+        return( retval );
+    }
+
+    if ( mysql_num_rows( result ) == 0 ) {
+        printf( "SPL: User %s is not authorized to use this service\n",
+            uniqname );
+        retval = MESSAGE_REJECT;
+        goto DONE;
+    }
+
+    if (( row = mysql_fetch_row( result )) == NULL ) {
+        fprintf( stderr, "mysql_fetch_row failed: %s\n",
+            mysql_error( &mysql ));
+        goto DONE;
+    }
+
+    threshold = strtoimax( row [ 0 ], NULL, 10 );
+    mysql_free_result( result );
+
+    len = snprintf( query, sizeof( query ),
+    	    "INSERT INTO `ut` (`uniqname`, `chksum`, `host`, `received`, `nrcpts`) VALUES ('%s', '%s', '%s', DEFAULT, %jd)",
+    	    uniqname, chksum, host, nrcpts );
+
+    if ( len >= sizeof( query )) {
+	fprintf( stderr, "INSERT too long! %d\n", len );
+	return( retval );
+    }
+
+    if (( rc = mysql_real_query( &mysql, query, len )) != 0 ) {
+	printf( "UserThrottle insert record fail: <%s> <%s> <%s> <%jd>\n",
+	    uniqname, chksum, host, nrcpts );
+	return( retval );
+    }
+
+    len = snprintf( query, sizeof( query ),
+            "SELECT SUM(`nrcpts`) FROM `ut` WHERE `uniqname` = '%s' AND `received` > TIMESTAMPADD(MINUTE, -1440, NOW())",
+            uniqname );
+
+    if ( len >= sizeof( query )) {
+        fprintf( stderr, "SELECT too long! %d\n", len );
+        return( retval );
+    }
+
+    if (( rc = mysql_real_query( &mysql, query, len )) != 0 ) {
+        fprintf( stderr, "SELECT failed: %s\n", mysql_error( &mysql ));
+        return( retval );
+    }
+
+    if (( result = mysql_store_result( &mysql )) == NULL ) {
+        fprintf( stderr, "mysql_store_result failed: %s\n",
+            mysql_error( &mysql ));
+        return( retval );
+    }
+
+    count = strtoimax( row [ 0 ], NULL, 10 );
+    if ( count > threshold ) {
+        printf( "UserThrottle: %s goes vroom and ting, %jd is more than %jd\n",
+            uniqname, count, threshold);
+        /* retval = MESSAGE_JAIL; */
+    }
+
+    DONE:
+    mysql_free_result( result );
+    return( retval );
+}
+
+int main( int ac, char *av[] )
 {
     MYSQL	mysql;
-    MYSQL_RES	*result;
-    MYSQL_ROW	row;
-    char	*uniqname, *chksum, *host, *timestamp, *nrcpts;
-    char	query[ 1024 ];
-    int		c, err = 0, len, rc;
+    int		c, err = 0;
+    int         retval = MESSAGE_ACCEPT;
+    intmax_t    threshold = 250;
     extern int	optind;
-    struct utsname *ub;
+    char        *binname, *binbase;
+    char        *uniqname;
 
-	/* To Do:  read a configuration file which contains an array of
-	 * (interval, limit) vectors, and exit with MESSAGE_TEMPFAIL or
-	 * possibly MESSAGE_JAIL if the authenticated user is over any
-	 * of the quotas.
-	 */
-
-    while (( c = getopt( ac, av, "f:" )) != -1 ) {
+    while (( c = getopt( ac, av, "f:l:u:" )) != -1 ) {
 	switch ( c ) {
 	case 'f' :
 	    config = optarg;
 	    break;
+
+        case 'l' :
+            threshold = strtoimax( optarg, NULL, 10 );
+            break;
+
+        case 'u' :
+            uniqname = optarg;
+            break;
 
 	case '?' :
 	default :
@@ -46,43 +198,12 @@ main( int ac, char *av[] )
 
     if ( err ) {
 	fprintf( stderr, "usage: %s [ -f mysql-config ]\n", av[ 0 ] );
-	exit( MESSAGE_ACCEPT );
+	exit( retval );
     }
-
-
-    if (( chksum = getenv( "SIMTA_CHECKSUM" )) == NULL ) {
-	fprintf( stderr, "SIMTA_CHECKSUM not set\n" );
-	exit( MESSAGE_ACCEPT );
-    }
-
-    if (( uniqname = getenv( "SIMTA_AUTH_ID" )) == NULL ) {
-	fprintf( stderr, "SIMTA_AUTH_ID not set\n" );
-	exit( MESSAGE_ACCEPT );
-    }
-
-    /* Assumes SIMTA_NRCPTS is an integer, may we should use atoi(3)? */
-    if (( nrcpts = getenv( "SIMTA_NRCPTS" )) == NULL ) {
-	fprintf( stderr, "SIMTA_NRCPTS not set\n" );
-	exit( MESSAGE_ACCEPT );
-    }
-
-    if ( ! ( ub = malloc( sizeof( struct utsname ) ) ) ) {
-	fprintf( stderr, "malloc fail\n" );
-	exit( MESSAGE_ACCEPT );
-    }
-
-    rc = uname( ub );
-
-    if ( rc ) {
-	fprintf( stderr, "uname fail %d\n", rc );
-	exit( MESSAGE_ACCEPT );
-    }
-
-    host = ub->nodename;
 
     if ( mysql_init( &mysql ) == NULL ) {
 	perror( "mysql_init" );
-	exit( MESSAGE_ACCEPT );
+	exit( retval );
     }
 
     if ( mysql_options( &mysql, MYSQL_READ_DEFAULT_FILE, config ) != 0 ) {
@@ -97,29 +218,24 @@ main( int ac, char *av[] )
 	goto DONE;
     }
 
-    len = snprintf( query, sizeof( query ),
-    	    "INSERT INTO ut VALUES ('%s', '%s', '%s', DEFAULT, %s)",
-    	    uniqname, chksum, host, nrcpts );
+    binname = strdup( av[ 0 ] );
+    binbase = basename( binname );
 
-    if ( len >= sizeof( query )) {
-	fprintf( stderr, "INSERT too long! %d\n", len );
-	goto DONE;
+    if ( strcasecmp( binbase, "userthrottle" ) == 0 ) {
+        retval = userthrottle( mysql );
     }
-
-    rc = mysql_real_query( &mysql, query, len );
-
-    if ( rc != 0 ) {
-	printf( "UserThrottle insert record fail: <%s> <%s> <%s> <%s>\n",
-	    uniqname, chksum, host, timestamp );
-	goto DONE;
+    else if ( strcasecmp( binbase, "add-spl" ) == 0 ) {
+        retval = update_user( mysql, uniqname, threshold );
     }
-
-    /* just insert the record for now, later versions might do a query here.
-     * See "Todo", above.
-     */
+    else {
+        fprintf( stderr,
+            "I don't know what to do when I'm called as %s\n",
+            binbase );
+    }
 
     DONE:
     mysql_close( &mysql );
-    exit( MESSAGE_ACCEPT );
+    exit( retval );
 }
+
 

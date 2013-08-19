@@ -1,7 +1,8 @@
+#include <string.h>
 
 #include "simta_mysql.h"
 
-main( int ac, char *av[] )
+int main( int ac, char *av[] )
 {
     MYSQL	mysql;
     MYSQL_RES	*result;

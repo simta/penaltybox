@@ -2,22 +2,11 @@
 This directory contains the "penaltybox" and related programs.  These are
 meant to be invoked from the simta content filter.  
 
-The penaltybox program communicates with an external MySQL database
-to store and query message checksums.  It uses these database records
-to implement a form of mail greylisting for mail inbound to a domain.
+The penaltybox program communicates with an external database to
+store and query message checksums. It uses these database records to
+implement a form of mail greylisting for mail inbound to a domain.
 
-Also included is the "userthrottle" program.  It uses a similar scheme
+Also included is the "userthrottle" program. It uses a similar scheme
 to monitor per-authenticated-user mail sending rates for a domain, and
-optionally manage the same. 
-
-Please note that actual database implementation details are excluded here.
-MySQL client configuration, DB table definitions etc. will be specific to
-your domain.
-
-
-
-use main CHANGELOG:  feature changes / milestones
-use CVS for incremental devel
-consider autoconf for build (variable selection)
-
+optionally manage the same.
 
