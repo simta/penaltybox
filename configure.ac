@@ -1,9 +1,11 @@
-AC_INIT([penaltybox], [1.0], [simta@umich.edu])
+AC_INIT([penaltybox], [1.9], [simta@umich.edu])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
 AC_PROG_CC
+AC_PROG_CC_C99
 AC_PROG_INSTALL
-AX_LIB_MYSQL([5.0])
+
+PKG_CHECK_MODULES([URCL], [urcl])
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])
