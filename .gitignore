@@ -2,6 +2,7 @@
 .deps/
 Makefile
 Makefile.in
+VERSION
 aclocal.m4
 autom4te.cache/
 config.h
@@ -13,6 +14,7 @@ configure
 depcomp
 install-sh
 missing
+packaging/rpm/penaltybox.spec
 stamp-h1
 penaltybox
 userthrottle
