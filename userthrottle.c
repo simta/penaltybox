@@ -104,7 +104,7 @@ int main( int ac, char *av[] )
 
     nrcpts = strtoll( getenv( "SIMTA_NRCPTS" ), NULL, 10 );
 
-    key = yaslcatlen( yaslauto( prefix ), ".userconf", 9 );
+    key = yaslcatlen( yaslauto( prefix ), ":userconf", 9 );
 
     if (( user_config = urcl_hget( urc, key, uniqname ))) {
         errno = 0;
@@ -121,7 +121,7 @@ int main( int ac, char *av[] )
         }
     }
 
-    key = yaslcatprintf( yaslcpy( key, prefix ), ".user.%s", uniqname );
+    key = yaslcatprintf( yaslcpy( key, prefix ), ":user:%s", uniqname );
 
     total = urcl_incrby( urc, key, nrcpts );
     if ( total == nrcpts ) {

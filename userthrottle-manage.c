@@ -81,7 +81,7 @@ int main( int ac, char *av[] )
         exit( 1 );
     }
 
-    key = yaslcatlen( yaslauto( prefix ), ".userconf", 9 );
+    key = yaslcatlen( yaslauto( prefix ), ":userconf", 9 );
     value = yaslfromlonglong( threshold );
 
     if ( urcl_hset( urc, key, uniqname, value )) {

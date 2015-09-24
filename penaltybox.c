@@ -86,7 +86,7 @@ int main( int ac, char *av[] )
         exit( MESSAGE_ACCEPT );
     }
 
-    wlkey = yaslcatprintf( yaslauto( prefix ), ".whitelist.%s", ip );
+    wlkey = yaslcatprintf( yaslauto( prefix ), ":whitelist:%s", ip );
 
     if ( urcl_get( urc, wlkey ) != NULL ) {
         urcl_incrby( urc, wlkey, 1 );
@@ -107,7 +107,7 @@ int main( int ac, char *av[] )
         yaslrange( subnet, 0, ( p - subnet ));
     }
 
-    key = yaslcatprintf( yaslauto( prefix ), ".record.%s", cksum );
+    key = yaslcatprintf( yaslauto( prefix ), ":record:%s", cksum );
 
     if (( timestamp = urcl_hget( urc, key, subnet )) != NULL ) {
         memset( &tm, 0, sizeof( struct tm ));
