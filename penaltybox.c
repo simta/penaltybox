@@ -90,7 +90,6 @@ int main( int ac, char *av[] )
 
     if ( urcl_get( urc, wlkey ) != NULL ) {
         urcl_incrby( urc, wlkey, 1 );
-        urcl_expire( urc, wlkey, 14400 );
         printf( "PenaltyBox: Whitelisted IP: [%s] <%s> %s\n",
                 ip, from, reason );
         exit( MESSAGE_ACCEPT );
@@ -105,6 +104,7 @@ int main( int ac, char *av[] )
     subnet = yaslauto( ip );
     if (( p = strrchr( subnet, '.' )) != NULL ) {
         yaslrange( subnet, 0, ( p - subnet ));
+        subnet = yaslcat( subnet, "0" );
     }
 
     key = yaslcatprintf( yaslauto( prefix ), ":record:%s", cksum );
