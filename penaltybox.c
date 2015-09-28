@@ -23,16 +23,18 @@ int main( int ac, char *av[] )
     char            *reason;
     char            *timestamp;
     char            *subnet;
+    char            *wl;
     yastr           key, wlkey;
     char            nowstr[ 42 ];
     int             c, err = 0;
+    long long       wl_threshold = 0;
     struct tm       tm;
     time_t          then, now;
     double          timediff;
     extern int      optind;
     URCL            *urc;
 
-    while (( c = getopt( ac, av, "h:p:P:" )) != -1 ) {
+    while (( c = getopt( ac, av, "h:p:P:w:" )) != -1 ) {
         switch ( c ) {
         case 'h':
             redis_host = optarg;
@@ -46,6 +48,13 @@ int main( int ac, char *av[] )
             break;
         case 'P':
             prefix = optarg;
+            break;
+        case 'w':
+            errno = 0;
+            wl_threshold = strtoll( optarg, NULL, 10 );
+            if ( errno != 0 ) {
+                err++;
+            }
             break;
         case '?':
         default:
@@ -88,13 +97,16 @@ int main( int ac, char *av[] )
 
     wlkey = yaslcatprintf( yaslauto( prefix ), ":whitelist:%s", ip );
 
-    if ( urcl_get( urc, wlkey ) != NULL ) {
-        urcl_incrby( urc, wlkey, 1 );
-        printf( "PenaltyBox: Whitelisted IP: [%s] <%s> %s\n",
-                ip, from, reason );
-        exit( MESSAGE_ACCEPT );
+    if ( wl_threshold > 0 ) {
+        if (( wl = urcl_get( urc, wlkey )) != NULL ) {
+            if ( strtoll( wl, NULL, 10 ) >= wl_threshold ) {
+                urcl_incrby( urc, wlkey, 1 );
+                printf( "PenaltyBox: Whitelisted IP: [%s] <%s> %s\n",
+                        ip, from, reason );
+                exit( MESSAGE_ACCEPT );
+            }
+        }
     }
-
     now = time( NULL );
     strftime( nowstr, 42, "%FT%TZ", gmtime( &now ));
 
@@ -117,8 +129,11 @@ int main( int ac, char *av[] )
         then = mktime( &tm );
         if (( timediff = difftime( now, then )) > 300 ) {
             urcl_del( urc, key );
-            urcl_incrby( urc, wlkey, 1 );
-            urcl_expire( urc, wlkey, 14400 );
+            if ( wl_threshold > 0 ) {
+                if ( urcl_incrby( urc, wlkey, 1 ) == 1 ) {
+                    urcl_expire( urc, wlkey, 14400 );
+                }
+            }
             printf( "PenaltyBox: Accept: %.0fs [%s] <%s> %s\n",
                     timediff, ip, from, reason );
             exit( MESSAGE_ACCEPT );
