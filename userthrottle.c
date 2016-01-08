@@ -1,10 +1,6 @@
-
-/* userthrottle
- *
- * 	A variation on the "penaltybox" concept, this program keys
- * 	on the authenticated user rather than the source IP.  See
- *	pb.c.
- *
+/*
+ * Copyright (c) Regents of The University of Michigan
+ * See COPYING.
  */
 
 #include <errno.h>
@@ -24,32 +20,21 @@ int main( int ac, char *av[] )
     int             redis_port = 6379;
     int		    c;
     int             err = 0;
-    int             retval = MESSAGE_ACCEPT;
     long long       nrcpts;
-    long long       threshold = USERTHROTTLE_DEFAULT;
     long long       total;
-    long long       user_threshold;
     extern int	    optind;
-    char            *user_config;
     char            *chksum;
     char            *prefix = USERTHROTTLE_PREFIX;
     char            *uniqname;
+    char            *env_nrcpts;
     yastr           key;
     URCL            *urc;
 
-    while (( c = getopt( ac, av, "h:l:p:P:" )) != -1 ) {
+    while (( c = getopt( ac, av, "h:p:P:" )) != -1 ) {
 	switch ( c ) {
 	case 'h':
 	    redis_host = optarg;
 	    break;
-
-        case 'l':
-            errno = 0;
-            threshold = strtoll( optarg, NULL, 10 );
-            if ( errno ) {
-                err++;
-            }
-            break;
 
         case 'p':
             errno = 0;
@@ -75,53 +60,41 @@ int main( int ac, char *av[] )
     }
 
     if ( err ) {
-	fprintf( stderr,
-                "usage: %s [ -h redis-host ] [ -p redis-port ] [ -l limit ]\n",
+	fprintf( stderr, "usage: %s [ -h redis-host ] [ -p redis-port ] "
+                "[ -P redis-prefix ]\n",
                 av[ 0 ] );
-	exit( retval );
+	exit( 1 );
     }
 
     if (( urc = urcl_connect( redis_host, redis_port )) == NULL ) {
         fprintf( stderr, "Unable to connect to %s:%d\n",
                 redis_host, redis_port );
-        exit( MESSAGE_ACCEPT );
+        exit( 1 );
     }
 
     if (( chksum = getenv( "SIMTA_BODY_CHECKSUM" )) == NULL ) {
 	fprintf( stderr, "SIMTA_BODY_CHECKSUM not set\n" );
-	exit( retval );
+	exit( 1 );
     }
 
     if (( uniqname = getenv( "SIMTA_AUTH_ID" )) == NULL ) {
 	fprintf( stderr, "SIMTA_AUTH_ID not set\n" );
-	exit( retval );
+	exit( 1 );
     }
 
-    if ( getenv( "SIMTA_NRCPTS" ) == NULL ) {
+    if (( env_nrcpts = getenv( "SIMTA_NRCPTS" )) == NULL ) {
 	fprintf( stderr, "SIMTA_NRCPTS not set\n" );
-	exit( retval );
+	exit( 1 );
     }
 
-    nrcpts = strtoll( getenv( "SIMTA_NRCPTS" ), NULL, 10 );
-
-    key = yaslcatlen( yaslauto( prefix ), ":userconf", 9 );
-
-    if (( user_config = urcl_hget( urc, key, uniqname ))) {
-        errno = 0;
-        user_threshold = strtoll( user_config, NULL, 10 );
-        if ( errno == 0 ) {
-            if ( user_threshold < 0 ) {
-                threshold *= llabs( user_threshold );
-            } else {
-                threshold = user_threshold;
-            }
-        } else {
-            /* Something went wrong, go unlimited */
-            threshold = 0;
-        }
+    errno = 0;
+    nrcpts = strtoll( env_nrcpts, NULL, 10 );
+    if ( errno != 0 ) {
+        fprintf( stderr, "SIMTA_NRCPTS invalid\n" );
+        exit( 1 );
     }
 
-    key = yaslcatprintf( yaslcpy( key, prefix ), ":user:%s", uniqname );
+    key = yaslcatprintf( yaslauto( prefix ), ":user:%s", uniqname );
 
     total = urcl_incrby( urc, key, nrcpts );
     if ( total == nrcpts ) {
@@ -129,10 +102,8 @@ int main( int ac, char *av[] )
         urcl_expire( urc, key, 86400 );
     }
 
-    if (( threshold > 0 ) && ( total >= threshold )) {
-        retval = MESSAGE_JAIL;
-    }
+    printf( "%lld\n", total );
 
-    exit( retval );
+    exit( 0 );
 }
 

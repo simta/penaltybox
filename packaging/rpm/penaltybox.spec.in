@@ -33,7 +33,6 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{_bindir}/penaltybox
 %{_bindir}/userthrottle
-%{_bindir}/userthrottle-manage
 
 %changelog
 * %(date "+%a %b %d %Y") (Automated RPM build) - %{version}-%{release}
