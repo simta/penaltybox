@@ -23,12 +23,14 @@ int main( int ac, char *av[] )
     long long       nrcpts;
     long long       total;
     extern int	    optind;
+    char            *endptr;
     char            *chksum;
     char            *prefix = USERTHROTTLE_PREFIX;
     char            *uniqname;
     char            *env_nrcpts;
     yastr           key;
-    URCL            *urc;
+    urclHandle      *urc;
+    redisReply      *res;
 
     while (( c = getopt( ac, av, "h:p:P:" )) != -1 ) {
 	switch ( c ) {
@@ -88,18 +90,24 @@ int main( int ac, char *av[] )
     }
 
     errno = 0;
-    nrcpts = strtoll( env_nrcpts, NULL, 10 );
-    if ( errno != 0 ) {
+    nrcpts = strtoll( env_nrcpts, &endptr, 10 );
+    if (( errno != 0 ) || ( *endptr != '\0' )) {
         fprintf( stderr, "SIMTA_NRCPTS invalid\n" );
         exit( 1 );
     }
 
     key = yaslcatprintf( yaslauto( prefix ), ":user:%s", uniqname );
 
-    total = urcl_incrby( urc, key, nrcpts );
+    if ((( res = urcl_command( urc, key, "INCRBY %s %s", key,
+            env_nrcpts )) == NULL ) || ( res->type != REDIS_REPLY_INTEGER )) {
+        fprintf( stderr, "INCRBY on %s failed\n", key );
+        exit( 1 );
+    }
+
+    total = res->integer;
     if ( total == nrcpts ) {
         /* This is a new key, set it to expire in 24 hours */
-        urcl_expire( urc, key, 86400 );
+        urcl_command( urc, key, "EXPIRE %s 86400", key );
     }
 
     printf( "%lld\n", total );

@@ -26,9 +26,7 @@ int main( int ac, char *av[] )
     char            *from;
     char            *prefix = PENALTYBOX_PREFIX;
     char            *reason;
-    char            *timestamp;
     char            *subnet;
-    char            *wl;
     yastr           key, wlkey;
     char            nowstr[ 42 ];
     int             c, err = 0;
@@ -37,7 +35,8 @@ int main( int ac, char *av[] )
     time_t          then, now;
     double          timediff;
     extern int      optind;
-    URCL            *urc;
+    urclHandle      *urc;
+    redisReply      *res;
 
     while (( c = getopt( ac, av, "h:p:P:w:" )) != -1 ) {
         switch ( c ) {
@@ -103,9 +102,10 @@ int main( int ac, char *av[] )
     wlkey = yaslcatprintf( yaslauto( prefix ), ":whitelist:%s", ip );
 
     if ( wl_threshold > 0 ) {
-        if (( wl = urcl_get( urc, wlkey )) != NULL ) {
-            if ( strtoll( wl, NULL, 10 ) >= wl_threshold ) {
-                urcl_incrby( urc, wlkey, 1 );
+        if ((( res = urcl_command( urc, wlkey, "GET %s", wlkey )) != NULL ) &&
+                ( res->type == REDIS_REPLY_STRING )) {
+            if ( strtoll( res->str, NULL, 10 ) >= wl_threshold ) {
+                urcl_command( urc, wlkey, "INCR %s", wlkey );
                 printf( "PenaltyBox: Whitelisted IP: [%s] <%s> %s\n",
                         ip, from, reason );
                 exit( MESSAGE_ACCEPT );
@@ -126,17 +126,23 @@ int main( int ac, char *av[] )
 
     key = yaslcatprintf( yaslauto( prefix ), ":record:%s", cksum );
 
-    if (( timestamp = urcl_hget( urc, key, subnet )) != NULL ) {
+    res = urcl_command( urc, key, "HGET %s %s", key, subnet );
+    if ((( res =
+            urcl_command( urc, key, "HGET %s %s", key, subnet )) != NULL ) &&
+            ( res->type == REDIS_REPLY_STRING )) {
         memset( &tm, 0, sizeof( struct tm ));
-        strptime( timestamp, "%FT%TZ", &tm );
+        strptime( res->str, "%FT%TZ", &tm );
         setenv( "TZ", "", 1 );
         tzset( );
         then = mktime( &tm );
         if (( timediff = difftime( now, then )) > 300 ) {
-            urcl_del( urc, key );
+            urcl_command( urc, key, "DEL %s", key );
             if ( wl_threshold > 0 ) {
-                if ( urcl_incrby( urc, wlkey, 1 ) == 1 ) {
-                    urcl_expire( urc, wlkey, 14400 );
+                if ((( res = urcl_command( urc, wlkey, "INCR %s",
+                        wlkey )) != NULL ) &&
+                        ( res->type == REDIS_REPLY_INTEGER ) &&
+                        ( res->integer == 1 )) {
+                    urcl_command( urc, wlkey, "EXPIRE %s 14400", wlkey );
                 }
             }
             printf( "PenaltyBox: Accept: %.0fs [%s] <%s> %s\n",
@@ -149,13 +155,14 @@ int main( int ac, char *av[] )
         }
     }
 
-    if ( urcl_hset( urc, key, subnet, nowstr )) {
-        printf( "PenaltyBox: Accept: 0s [%s] <%s> database error", ip, from );
+    if (( res = urcl_command( urc, key, "HSET %s %s %s", key, subnet,
+            nowstr )) == NULL || ( res->type != REDIS_REPLY_INTEGER )) {
+        printf( "PenaltyBox: Accept: 0s [%s] <%s> database error\n", ip, from );
         exit( MESSAGE_ACCEPT );
     }
 
     /* expire after three days */
-    urcl_expire( urc, key, 259200 );
+    urcl_command( urc, key, "EXPIRE %s 259200", key );
     printf( "PenaltyBox: Record: [%s] <%s> %s\n", ip, from, reason );
     exit( MESSAGE_TEMPFAIL );
 

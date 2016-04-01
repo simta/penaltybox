@@ -5,7 +5,7 @@ AC_PROG_CC
 AC_PROG_CC_C99
 AC_PROG_INSTALL
 
-PKG_CHECK_MODULES([URCL], [urcl])
+PKG_CHECK_MODULES([URCL], [urcl >= 1.1])
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile packaging/rpm/penaltybox.spec])
