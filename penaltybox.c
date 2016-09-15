@@ -27,10 +27,10 @@ int main( int ac, char *av[] )
     char            *prefix = PENALTYBOX_PREFIX;
     char            *reason;
     char            *subnet;
-    yastr           key, wlkey;
+    yastr           key, ht_key;
     char            nowstr[ 42 ];
     int             c, err = 0;
-    long long       wl_threshold = 0;
+    long long       ht_threshold = 0;
     struct tm       tm;
     time_t          then, now;
     double          timediff;
@@ -38,10 +38,17 @@ int main( int ac, char *av[] )
     urclHandle      *urc;
     redisReply      *res;
 
-    while (( c = getopt( ac, av, "h:p:P:w:" )) != -1 ) {
+    while (( c = getopt( ac, av, "h:H:p:P:" )) != -1 ) {
         switch ( c ) {
         case 'h':
             redis_host = optarg;
+            break;
+        case 'H':
+            errno = 0;
+            ht_threshold = strtoll( optarg, NULL, 10 );
+            if ( errno != 0 ) {
+                err++;
+            }
             break;
         case 'p':
             errno = 0;
@@ -52,13 +59,6 @@ int main( int ac, char *av[] )
             break;
         case 'P':
             prefix = optarg;
-            break;
-        case 'w':
-            errno = 0;
-            wl_threshold = strtoll( optarg, NULL, 10 );
-            if ( errno != 0 ) {
-                err++;
-            }
             break;
         case '?':
         default:
@@ -99,14 +99,14 @@ int main( int ac, char *av[] )
         exit( MESSAGE_ACCEPT );
     }
 
-    wlkey = yaslcatprintf( yaslauto( prefix ), ":whitelist:%s", ip );
+    ht_key = yaslcatprintf( yaslauto( prefix ), ":hattrick:%s", ip );
 
-    if ( wl_threshold > 0 ) {
-        if ((( res = urcl_command( urc, wlkey, "GET %s", wlkey )) != NULL ) &&
+    if ( ht_threshold > 0 ) {
+        if ((( res = urcl_command( urc, ht_key, "GET %s", ht_key )) != NULL ) &&
                 ( res->type == REDIS_REPLY_STRING )) {
-            if ( strtoll( res->str, NULL, 10 ) >= wl_threshold ) {
-                urcl_command( urc, wlkey, "INCR %s", wlkey );
-                printf( "PenaltyBox: Whitelisted IP: [%s] <%s> %s\n",
+            if ( strtoll( res->str, NULL, 10 ) >= ht_threshold ) {
+                urcl_command( urc, ht_key, "INCR %s", ht_key );
+                printf( "PenaltyBox: No Penalty: [%s] <%s> %s\n",
                         ip, from, reason );
                 exit( MESSAGE_ACCEPT );
             }
@@ -137,12 +137,12 @@ int main( int ac, char *av[] )
         then = mktime( &tm );
         if (( timediff = difftime( now, then )) > 300 ) {
             urcl_command( urc, key, "DEL %s", key );
-            if ( wl_threshold > 0 ) {
-                if ((( res = urcl_command( urc, wlkey, "INCR %s",
-                        wlkey )) != NULL ) &&
+            if ( ht_threshold > 0 ) {
+                if ((( res = urcl_command( urc, ht_key, "INCR %s",
+                        ht_key )) != NULL ) &&
                         ( res->type == REDIS_REPLY_INTEGER ) &&
                         ( res->integer == 1 )) {
-                    urcl_command( urc, wlkey, "EXPIRE %s 14400", wlkey );
+                    urcl_command( urc, ht_key, "EXPIRE %s 14400", ht_key );
                 }
             }
             printf( "PenaltyBox: Accept: %.0fs [%s] <%s> %s\n",
