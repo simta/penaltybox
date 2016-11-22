@@ -1,5 +1,5 @@
 AC_INIT([penaltybox], m4_esyscmd([bash version.sh]), [simta@umich.edu])
-AM_INIT_AUTOMAKE([-Wall -Werror foreign])
+AM_INIT_AUTOMAKE([-Wall -Werror foreign no-dist-gzip dist-xz])
 
 AC_PROG_CC
 AC_PROG_CC_C99
