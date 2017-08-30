@@ -24,7 +24,6 @@ int main( int ac, char *av[] )
     long long       total;
     extern int	    optind;
     char            *endptr;
-    char            *chksum;
     char            *prefix = USERTHROTTLE_PREFIX;
     char            *uniqname;
     char            *env_nrcpts;
@@ -72,11 +71,6 @@ int main( int ac, char *av[] )
         fprintf( stderr, "Unable to connect to %s:%d\n",
                 redis_host, redis_port );
         exit( 1 );
-    }
-
-    if (( chksum = getenv( "SIMTA_BODY_CHECKSUM" )) == NULL ) {
-	fprintf( stderr, "SIMTA_BODY_CHECKSUM not set\n" );
-	exit( 1 );
     }
 
     if (( uniqname = getenv( "SIMTA_AUTH_ID" )) == NULL ) {
