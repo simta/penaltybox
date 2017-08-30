@@ -6,8 +6,11 @@
 #define _XOPEN_SOURCE 700
 
 #include <errno.h>
+#include <netdb.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <time.h>
 
 #include <urcl.h>
@@ -16,11 +19,12 @@
 
 #include "penaltybox.h"
 
+static yastr pb_ip_subnet( const char *, int, int );
+
 int main( int ac, char *av[] )
 {
     char            *redis_host = "127.0.0.1";
     int             redis_port = 6379;
-    char            *p;
     char            *ip;
     char            *cksum;
     char            *from;
@@ -115,14 +119,7 @@ int main( int ac, char *av[] )
     now = time( NULL );
     strftime( nowstr, 42, "%FT%TZ", gmtime( &now ));
 
-    /* FIXME: This should really parse the IP and do math, to make it more
-     * flexible (and IPv6 ready.)
-     */
-    subnet = yaslauto( ip );
-    if (( p = strrchr( subnet, '.' )) != NULL ) {
-        yaslrange( subnet, 0, ( p - subnet ));
-        subnet = yaslcat( subnet, "0" );
-    }
+    subnet = pb_ip_subnet( ip, 24, 64 );
 
     key = yaslcatprintf( yaslauto( prefix ), ":record:%s", cksum );
 
@@ -166,4 +163,56 @@ int main( int ac, char *av[] )
     printf( "PenaltyBox: Record: [%s] <%s> %s\n", ip, from, reason );
     exit( MESSAGE_TEMPFAIL );
 
+}
+
+    yastr
+pb_ip_subnet( const char *ip, int cidr4, int cidr6 )
+{
+    int                 rc;
+    int                 bytes;
+    int                 bits;
+    struct addrinfo     *ai;
+    struct addrinfo     hints;
+    struct sockaddr_in6 *addr;
+    char                buf[ INET6_ADDRSTRLEN ];
+
+    if ( cidr4 == 0 && cidr6 == 0 ) {
+        goto error;
+    }
+
+    memset( &hints, 0, sizeof( struct addrinfo ));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
+    if (( rc = getaddrinfo( ip, NULL, &hints, &ai )) != 0 ) {
+        goto error;
+    }
+
+    if ( ai->ai_addr->sa_family == AF_INET ) {
+        ((struct sockaddr_in *)(ai->ai_addr))->sin_addr.s_addr &=
+                htonl(( 0xFFFFFFFF << ( 32 - cidr4 )));
+    } else {
+        addr = (struct sockaddr_in6 *)(ai->ai_addr);
+        bytes = cidr6 / 8;
+        bits = cidr6 % 8;
+        if ( bits > 0 ) {
+            /* mask out partial byte */
+            addr->sin6_addr.s6_addr[ bytes ] &= ( 0xFF << ( 8 - bits ));
+            bytes++;
+        }
+        if ( bytes < 16 ) {
+            /* zero out whole bytes */
+            memset( addr->sin6_addr.s6_addr + bytes, 0, 16 - bytes);
+        }
+    }
+
+    if (( rc = getnameinfo( ai->ai_addr, (( ai->ai_addr->sa_family == AF_INET6 )
+            ? sizeof( struct sockaddr_in6 ) : sizeof( struct sockaddr_in )),
+            buf, INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST )) != 0 ) {
+        goto error;
+    }
+
+    return yaslauto( buf );
+
+error:
+    return yaslauto( ip );
 }
