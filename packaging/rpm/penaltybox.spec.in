@@ -5,7 +5,6 @@ Name:           @PACKAGE_NAME@
 Version:        @PACKAGE_VERSION@
 Release:        1%{?dist}
 License:        BSD
-Group:          Applications/Internet
 URL:            http://its.umich.edu/
 Source0:        %{name}-%{version}.tar.xz
 BuildRequires:  setup
@@ -25,9 +24,6 @@ make %{?_smp_mflags}
 %install
 rm -rf %{buildroot}
 make DESTDIR=%{buildroot} INSTALL_OPTS='' install
-
-%clean
-rm -rf %{buildroot}
 
 %files
 %defattr(-,root,root,-)
