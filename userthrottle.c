@@ -20,19 +20,31 @@ int main( int ac, char *av[] )
     int             redis_port = 6379;
     int		    c;
     int             err = 0;
-    long long       nrcpts;
+    long long       score;
     long long       total;
     extern int	    optind;
     char            *endptr;
     char            *prefix = USERTHROTTLE_PREFIX;
-    char            *uniqname;
+    yastr           buf;
+    char            *raw_uniqname;
+    yastr           uniqname;
+    char            *raw_mailfrom;
+    yastr           mailfrom;
+    char            *raw_hfrom;
+    yastr           hfrom = NULL;
+    yastr           domain = NULL;
     char            *env_nrcpts;
     yastr           key;
     urclHandle      *urc;
     redisReply      *res;
 
-    while (( c = getopt( ac, av, "h:p:P:" )) != -1 ) {
+    while (( c = getopt( ac, av, "d:h:p:P:" )) != -1 ) {
 	switch ( c ) {
+        case 'd':
+            domain = yaslauto( optarg );
+            yasltolower( domain );
+            break;
+
 	case 'h':
 	    redis_host = optarg;
 	    break;
@@ -62,7 +74,7 @@ int main( int ac, char *av[] )
 
     if ( err ) {
 	fprintf( stderr, "usage: %s [ -h redis-host ] [ -p redis-port ] "
-                "[ -P redis-prefix ]\n",
+                "[ -P redis-prefix ] [ -d expected-domain ]\n",
                 av[ 0 ] );
 	exit( 1 );
     }
@@ -73,9 +85,23 @@ int main( int ac, char *av[] )
         exit( 1 );
     }
 
-    if (( uniqname = getenv( "SIMTA_AUTH_ID" )) == NULL ) {
+    if (( raw_uniqname = getenv( "SIMTA_AUTH_ID" )) == NULL ) {
 	fprintf( stderr, "SIMTA_AUTH_ID not set\n" );
 	exit( 1 );
+    }
+    uniqname = yaslauto( raw_uniqname );
+    yasltolower( uniqname );
+
+    if (( raw_mailfrom = getenv( "SIMTA_SMTP_MAIL_FROM" )) == NULL ) {
+        fprintf( stderr, "SIMTA_SMTP_MAIL_FROM not set\n" );
+        exit( 1 );
+    }
+    mailfrom = yaslauto( raw_mailfrom );
+    yasltolower( mailfrom );
+
+    if (( raw_hfrom = getenv( "SIMTA_HEADER_FROM" )) != NULL ) {
+        hfrom = yaslauto( raw_hfrom );
+        yasltolower( hfrom );
     }
 
     if (( env_nrcpts = getenv( "SIMTA_NRCPTS" )) == NULL ) {
@@ -84,22 +110,65 @@ int main( int ac, char *av[] )
     }
 
     errno = 0;
-    nrcpts = strtoll( env_nrcpts, &endptr, 10 );
+    score = strtoll( env_nrcpts, &endptr, 10 );
     if (( errno != 0 ) || ( *endptr != '\0' )) {
         fprintf( stderr, "SIMTA_NRCPTS invalid\n" );
         exit( 1 );
     }
 
-    key = yaslcatprintf( yaslauto( prefix ), ":user:%s", uniqname );
+    /* Adjust the score if the sender doesn't match the authenticated user */
+    buf = yasldup( mailfrom );
+    yaslrange( buf, 0, yasllen( uniqname ) - 1 );
+    if ( yaslcmp( buf, uniqname) != 0 ) {
+        score *= 2;
+    }
 
+    /* Adjust the score if the addresses don't match */
+    if ( hfrom && ( yaslcmp( mailfrom, hfrom ) != 0 )) {
+        score *= 2;
+    }
+
+    /* Adjust the score if it's from a different domain */
+    if ( domain ) {
+        buf = yasldup( mailfrom );
+        yaslrange( buf, 0 - (yasllen( domain )), -1 );
+        if ( yaslcmp( buf, domain ) != 0 ) {
+            score *= 2;
+        }
+    }
+
+    /* Adjust the score if the authuser has sent from multiple addresses */
+    key = yaslcatprintf( yaslauto( prefix ), ":user:%s:rfc5321.mailfrom",
+            uniqname );
+
+    if ((( res = urcl_command( urc, key, "HINCRBY %s %s %s", key, mailfrom,
+            "1" )) == NULL ) || ( res->type != REDIS_REPLY_INTEGER )) {
+        fprintf( stderr, "HINCRBY on %s %s failed\n", key, mailfrom );
+        exit( 1 );
+    }
+    /* This hash never expires if it's active. */
+    urcl_command( urc, key, "EXPIRE %s 86400", key );
+
+    if ((( res = urcl_command( urc, key, "HLEN %s", key )) == NULL ) ||
+            ( res->type != REDIS_REPLY_INTEGER )) {
+        fprintf( stderr, "HLEN on %s failed\n", key );
+        exit( 1 );
+    }
+
+    if ( res->integer > 1 ) {
+        score *= ( res->integer * ( res->integer - 1 ));
+    }
+
+    key = yaslcatprintf( yaslauto( prefix ), ":user:%s", uniqname );
     if ((( res = urcl_command( urc, key, "INCRBY %s %s", key,
-            env_nrcpts )) == NULL ) || ( res->type != REDIS_REPLY_INTEGER )) {
+            yaslfromlonglong( score ))) == NULL ) ||
+            ( res->type != REDIS_REPLY_INTEGER )) {
         fprintf( stderr, "INCRBY on %s failed\n", key );
         exit( 1 );
     }
 
     total = res->integer;
-    if ( total == nrcpts ) {
+    if ( total == score ) {
         /* This is a new key, set it to expire in 24 hours */
         urcl_command( urc, key, "EXPIRE %s 86400", key );
     }
