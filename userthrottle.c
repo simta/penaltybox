@@ -26,14 +26,11 @@ int main( int ac, char *av[] )
     char            *endptr;
     char            *prefix = USERTHROTTLE_PREFIX;
     yastr           buf;
-    char            *raw_uniqname;
+    char            *env_buf;
     yastr           uniqname;
-    char            *raw_mailfrom;
     yastr           mailfrom;
-    char            *raw_hfrom;
     yastr           hfrom = NULL;
     yastr           domain = NULL;
-    char            *env_nrcpts;
     yastr           key;
     urclHandle      *urc;
     redisReply      *res;
@@ -79,40 +76,40 @@ int main( int ac, char *av[] )
 	exit( 1 );
     }
 
-    if (( urc = urcl_connect( redis_host, redis_port )) == NULL ) {
-        fprintf( stderr, "Unable to connect to %s:%d\n",
-                redis_host, redis_port );
-        exit( 1 );
-    }
-
-    if (( raw_uniqname = getenv( "SIMTA_AUTH_ID" )) == NULL ) {
+    if (( env_buf = getenv( "SIMTA_AUTH_ID" )) == NULL ) {
 	fprintf( stderr, "SIMTA_AUTH_ID not set\n" );
 	exit( 1 );
     }
-    uniqname = yaslauto( raw_uniqname );
+    uniqname = yaslauto( env_buf );
     yasltolower( uniqname );
 
-    if (( raw_mailfrom = getenv( "SIMTA_SMTP_MAIL_FROM" )) == NULL ) {
+    if (( env_buf = getenv( "SIMTA_SMTP_MAIL_FROM" )) == NULL ) {
         fprintf( stderr, "SIMTA_SMTP_MAIL_FROM not set\n" );
         exit( 1 );
     }
-    mailfrom = yaslauto( raw_mailfrom );
+    mailfrom = yaslauto( env_buf );
     yasltolower( mailfrom );
 
-    if (( raw_hfrom = getenv( "SIMTA_HEADER_FROM" )) != NULL ) {
-        hfrom = yaslauto( raw_hfrom );
+    if (( env_buf = getenv( "SIMTA_HEADER_FROM" )) != NULL ) {
+        hfrom = yaslauto( env_buf );
         yasltolower( hfrom );
     }
 
-    if (( env_nrcpts = getenv( "SIMTA_NRCPTS" )) == NULL ) {
+    if (( env_buf = getenv( "SIMTA_NRCPTS" )) == NULL ) {
 	fprintf( stderr, "SIMTA_NRCPTS not set\n" );
 	exit( 1 );
     }
 
     errno = 0;
-    score = strtoll( env_nrcpts, &endptr, 10 );
+    score = strtoll( env_buf, &endptr, 10 );
     if (( errno != 0 ) || ( *endptr != '\0' )) {
         fprintf( stderr, "SIMTA_NRCPTS invalid\n" );
+        exit( 1 );
+    }
+
+    if (( urc = urcl_connect( redis_host, redis_port )) == NULL ) {
+        fprintf( stderr, "Unable to connect to %s:%d\n",
+                redis_host, redis_port );
         exit( 1 );
     }
 
