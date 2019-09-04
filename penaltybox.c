@@ -25,6 +25,7 @@ int
 main(int ac, char *av[]) {
     char *      redis_host = "127.0.0.1";
     int         redis_port = 6379;
+    int         window = 300;
     char *      ip;
     char *      cksum;
     char *      from;
@@ -42,7 +43,7 @@ main(int ac, char *av[]) {
     urclHandle *urc;
     redisReply *res;
 
-    while ((c = getopt(ac, av, "h:H:p:P:")) != -1) {
+    while ((c = getopt(ac, av, "h:H:p:P:w:")) != -1) {
         switch (c) {
         case 'h':
             redis_host = optarg;
@@ -63,6 +64,13 @@ main(int ac, char *av[]) {
             break;
         case 'P':
             prefix = optarg;
+            break;
+        case 'w':
+            errno = 0;
+            window = strtoll(optarg, NULL, 10);
+            if (errno != 0) {
+                err++;
+            }
             break;
         case '?':
         default:
@@ -130,7 +138,7 @@ main(int ac, char *av[]) {
         setenv("TZ", "", 1);
         tzset();
         then = mktime(&tm);
-        if ((timediff = difftime(now, then)) > 300) {
+        if ((timediff = difftime(now, then)) > window) {
             urcl_command(urc, key, "DEL %s", key);
             if (ht_threshold > 0) {
                 if (((res = urcl_command(urc, ht_key, "INCR %s", ht_key)) !=
