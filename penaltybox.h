@@ -18,6 +18,7 @@
 
 #define PENALTYBOX_PREFIX               "pb"
 #define USERTHROTTLE_PREFIX             "ut"
-#define USERTHROTTLE_DEFAULT            250;
+#define USERTHROTTLE_DEFAULT            250
+#define IPTHROTTLE_PREFIX               "ipt"
 
 #endif /* PENALTYBOX_H */
