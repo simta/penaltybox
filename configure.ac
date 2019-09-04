@@ -8,5 +8,5 @@ AC_PROG_INSTALL
 PKG_CHECK_MODULES([URCL], [urcl >= 1.1])
 
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile packaging/rpm/penaltybox.spec])
+AC_CONFIG_FILES([Makefile test/Makefile packaging/rpm/penaltybox.spec])
 AC_OUTPUT

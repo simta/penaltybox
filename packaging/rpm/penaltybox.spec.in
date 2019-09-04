@@ -27,6 +27,7 @@ make DESTDIR=%{buildroot} INSTALL_OPTS='' install
 
 %files
 %defattr(-,root,root,-)
+%{_bindir}/ipthrottle
 %{_bindir}/penaltybox
 %{_bindir}/userthrottle
 
