@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import subprocess
 
 import pytest
@@ -15,16 +17,19 @@ def run_ipthrottle(tool_path, redis):
         if hfrom:
             env['SIMTA_HEADER_FROM'] = hfrom
 
-        res = subprocess.check_output(
+        res = subprocess.run(
             [
                 tool_path('ipthrottle'),
                 '-p', str(redis),
                 '-d', 'example.com',
             ],
+            check=True,
+            capture_output=True,
+            text=True,
             env=env,
         )
 
-        return res.strip()
+        return res.stdout.strip()
     return _run_ipthrottle
 
 

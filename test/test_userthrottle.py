@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import subprocess
 
 import pytest
@@ -16,16 +18,19 @@ def run_userthrottle(tool_path, redis):
         if hfrom:
             env['SIMTA_HEADER_FROM'] = hfrom
 
-        res = subprocess.check_output(
+        res = subprocess.run(
             [
                 tool_path('userthrottle'),
                 '-p', str(redis),
                 '-d', 'example.com',
             ],
             env=env,
+            check=True,
+            capture_output=True,
+            text=True,
         )
 
-        return res.strip()
+        return res.stdout.strip()
     return _run_userthrottle
 
 

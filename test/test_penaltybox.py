@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import subprocess
 import time
 
@@ -13,7 +15,7 @@ def run_penaltybox(tool_path, redis):
             'SIMTA_SMTP_MAIL_FROM': 'foo@example.com',
         }
 
-        return subprocess.call(
+        return subprocess.run(
             [
                 tool_path('penaltybox'),
                 '-p', str(redis),
@@ -22,7 +24,7 @@ def run_penaltybox(tool_path, redis):
                 'no reason',
             ],
             env=env,
-        )
+        ).returncode
 
     return _run_penaltybox
 

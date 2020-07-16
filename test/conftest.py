@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import errno
 import json
 import os
@@ -9,6 +11,7 @@ import tempfile
 import time
 
 import pytest
+
 
 def openport(port):
     # Find a usable port by iterating until there's an unconnectable port
