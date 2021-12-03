@@ -1,0 +1,95 @@
+name: build
+on:
+  push:
+  pull_request:
+
+jobs:
+  clang_format:
+    name: clang-format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Lint code formatting
+        run: |
+          clang-format -i *.c *.h
+          git diff
+          git status --porcelain | grep -q '^ M' && exit 1 || exit 0
+
+  flake8:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Install flake8
+        run: sudo pip install flake8
+
+      - name: Lint Python code
+        run: flake8 --max-line-length=160
+
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          path: penaltybox
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: sudo apt install redis-server libhiredis-dev
+
+      - name: Install Python dependencies
+        run: sudo pip install pytest
+
+      - name: Cache built dependencies
+        uses: actions/cache@v2
+        id: cache-deps
+        with:
+          path: ${{ github.workspace }}/.deps
+          key: deps-${{ hashFiles('penaltybox/.github/workflows/**') }}
+
+      - name: Install fpm
+        run: sudo gem install --no-document fpm
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+
+      - name: Build urcl
+        uses: flowerysong/gh-build-deb@v1
+        with:
+          src: https://github.com/simta/urcl
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+
+      - name: Install built dependencies
+        run: sudo dpkg -R -i ${{ github.workspace }}/.deps
+
+      - name: Build penaltybox
+        run: |
+          autoreconf -fiv
+          CFLAGS='-Wall -Werror -fprofile-arcs -ftest-coverage' ./configure
+          make -j4
+        working-directory: ${{ github.workspace }}/penaltybox
+
+      - name: Test penaltybox
+        run: make check
+        working-directory: ${{ github.workspace }}/penaltybox
+        env:
+          LDAP_SERVER: ldap://localhost/
+
+      - name: Generate coverage reports
+        run: gcov *.c
+        working-directory: ${{ github.workspace }}/penaltybox
+
+      - name: Save code coverage reports
+        uses: actions/upload-artifact@v2
+        with:
+          name: gcov
+          path: penaltybox/*.gcov
+
+      - name: Build penaltybox with clang
+        run: |
+          make distclean
+          CC=clang ./configure
+          make -j4 CFLAGS='-Wall -Werror'
+        working-directory: ${{ github.workspace }}/penaltybox

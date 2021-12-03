@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 
 import errno
-import json
 import os
-import signal
-import smtplib
 import socket
 import subprocess
-import tempfile
 import time
 
 import pytest
@@ -17,12 +13,12 @@ def openport(port):
     # Find a usable port by iterating until there's an unconnectable port
     while True:
         try:
-            conn = socket.create_connection(('localhost', port), 0.1)
+            socket.create_connection(('localhost', port), 0.1)
             port += 1
             if port > 65535:
                 raise ValueError("exhausted TCP port range without finding a free one")
         except socket.error:
-            return( port )
+            return port
 
 
 @pytest.fixture
@@ -43,7 +39,7 @@ def redis():
     while not running:
         i += 1
         try:
-            conn = socket.create_connection(('localhost', port), 0.1)
+            socket.create_connection(('localhost', port), 0.1)
             running = True
         except socket.error:
             if i > 20:
