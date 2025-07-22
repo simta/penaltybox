@@ -29,10 +29,12 @@ main(int ac, char *av[]) {
     char       *ip;
     char       *cksum;
     char       *from;
+    char       *message_id;
     char       *prefix = PENALTYBOX_PREFIX;
     char       *reason;
     char       *subnet;
     yastr       key, ht_key;
+    yastr       msg_info;
     char        nowstr[ 42 ];
     int         c, err = 0;
     long long   ht_threshold = 0;
@@ -104,11 +106,22 @@ main(int ac, char *av[]) {
         fprintf(stderr, "SIMTA_SMTP_MAIL_FROM not set\n");
         exit(MESSAGE_ACCEPT);
     }
+    if ((message_id = getenv("SIMTA_MID")) == NULL) {
+        fprintf(stderr, "SIMTA_MID not set\n");
+        exit(MESSAGE_ACCEPT);
+    }
 
     if ((urc = urcl_connect(redis_host, redis_port)) == NULL) {
         fprintf(stderr, "Unable to connect to %s:%d\n", redis_host, redis_port);
         exit(MESSAGE_ACCEPT);
     }
+
+    msg_info = yaslcatprintf(yaslempty(), "remote_ip=%s mail_from=", ip);
+    msg_info = yaslcatrepr(msg_info, from, strlen(from));
+    msg_info = yaslcat(msg_info, " message_id=");
+    msg_info = yaslcatrepr(msg_info, message_id, strlen(message_id));
+    msg_info = yaslcat(msg_info, " reason=");
+    msg_info = yaslcatrepr(msg_info, reason, strlen(reason));
 
     ht_key = yaslcatprintf(yaslauto(prefix), ":hattrick:%s", ip);
 
@@ -117,8 +130,7 @@ main(int ac, char *av[]) {
                 (res->type == REDIS_REPLY_STRING)) {
             if (strtoll(res->str, NULL, 10) >= ht_threshold) {
                 urcl_command(urc, ht_key, "INCR %s", ht_key);
-                printf("PenaltyBox: No Penalty: [%s] <%s> %s\n", ip, from,
-                        reason);
+                printf("PenaltyBox: No Penalty: %s\n", msg_info);
                 exit(MESSAGE_ACCEPT);
             }
         }
@@ -148,12 +160,12 @@ main(int ac, char *av[]) {
                     urcl_command(urc, ht_key, "EXPIRE %s 14400", ht_key);
                 }
             }
-            printf("PenaltyBox: Accept: %.0fs [%s] <%s> %s\n", timediff, ip,
-                    from, reason);
+            printf("PenaltyBox: Accept: elapsed=%.0fs %s\n", timediff,
+                    msg_info);
             exit(MESSAGE_ACCEPT);
         } else {
-            printf("PenaltyBox: Window: %.0fs [%s] <%s> %s\n", timediff, ip,
-                    from, reason);
+            printf("PenaltyBox: Window: elapsed=%.0fs %s\n", timediff,
+                    msg_info);
             exit(MESSAGE_TEMPFAIL);
         }
     }
@@ -161,13 +173,15 @@ main(int ac, char *av[]) {
     if ((res = urcl_command(urc, key, "HSET %s %s %s", key, subnet, nowstr)) ==
                     NULL ||
             (res->type != REDIS_REPLY_INTEGER)) {
-        printf("PenaltyBox: Accept: 0s [%s] <%s> database error\n", ip, from);
+        printf("PenaltyBox: Accept: elapsed=0s skip_reason=\"database error\" "
+               "%s\n",
+                msg_info);
         exit(MESSAGE_ACCEPT);
     }
 
     /* expire after three days */
     urcl_command(urc, key, "EXPIRE %s 259200", key);
-    printf("PenaltyBox: Record: [%s] <%s> %s\n", ip, from, reason);
+    printf("PenaltyBox: Record: %s\n", msg_info);
     exit(MESSAGE_TEMPFAIL);
 }
 
