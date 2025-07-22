@@ -28,7 +28,7 @@ def redis():
     devnull = open(os.devnull, 'w')
     redis_proc = None
     try:
-        redis_proc = subprocess.Popen(['redis-server', '--port', str(port)], stdout=devnull, stderr=devnull)
+        redis_proc = subprocess.Popen(['redis-server', '--port', str(port), '--save', '""'], stdout=devnull, stderr=devnull)
     except OSError as e:
         if e.errno != errno.ENOENT:
             raise
