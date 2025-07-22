@@ -23,15 +23,15 @@ static yastr pb_ip_subnet(const char *, int, int);
 
 int
 main(int ac, char *av[]) {
-    char *      redis_host = "127.0.0.1";
+    char       *redis_host = "127.0.0.1";
     int         redis_port = 6379;
     int         window = 300;
-    char *      ip;
-    char *      cksum;
-    char *      from;
-    char *      prefix = PENALTYBOX_PREFIX;
-    char *      reason;
-    char *      subnet;
+    char       *ip;
+    char       *cksum;
+    char       *from;
+    char       *prefix = PENALTYBOX_PREFIX;
+    char       *reason;
+    char       *subnet;
     yastr       key, ht_key;
     char        nowstr[ 42 ];
     int         c, err = 0;
@@ -176,7 +176,7 @@ pb_ip_subnet(const char *ip, int cidr4, int cidr6) {
     int                  rc;
     int                  bytes;
     int                  bits;
-    struct addrinfo *    ai;
+    struct addrinfo     *ai;
     struct addrinfo      hints;
     struct sockaddr_in6 *addr;
     char                 buf[ INET6_ADDRSTRLEN ];

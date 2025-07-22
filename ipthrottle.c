@@ -16,18 +16,18 @@
 
 int
 main(int ac, char *av[]) {
-    char *      redis_host = "127.0.0.1";
+    char       *redis_host = "127.0.0.1";
     int         redis_port = 6379;
     int         c;
     int         err = 0;
     long long   score;
     long long   total;
     extern int  optind;
-    char *      endptr;
-    char *      prefix = IPTHROTTLE_PREFIX;
+    char       *endptr;
+    char       *prefix = IPTHROTTLE_PREFIX;
     yastr       buf;
-    char *      ip;
-    char *      env_buf;
+    char       *ip;
+    char       *env_buf;
     yastr       mailfrom;
     yastr       hfrom = NULL;
     yastr       domain = NULL;
