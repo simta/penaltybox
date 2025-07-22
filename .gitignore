@@ -5,6 +5,7 @@ Makefile.in
 VERSION
 aclocal.m4
 autom4te.cache/
+compile
 config.h
 config.h.in
 config.h.in~
@@ -13,8 +14,10 @@ config.status
 configure
 depcomp
 install-sh
+ipthrottle
 missing
 packaging/rpm/penaltybox.spec
 stamp-h1
 penaltybox
+penaltybox-*.tar.*
 userthrottle
