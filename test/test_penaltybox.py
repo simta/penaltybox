@@ -14,6 +14,7 @@ def run_penaltybox(tool_path, redis):
             'SIMTA_REMOTE_IP': ip,
             'SIMTA_SMTP_MAIL_FROM': 'foo@example.com',
             'SIMTA_MID': 'bar1234@mail.example.com',
+            'SIMTA_UID': '689361A2.1B2032DC.DEAD60ff.655321',
         }
 
         return subprocess.run(
@@ -35,14 +36,14 @@ def run_penaltybox(tool_path, redis):
 def test_single(run_penaltybox):
     res = run_penaltybox()
     assert res.returncode == 1
-    assert res.stdout == 'PenaltyBox: Record: remote_ip=10.11.112.113 mail_from="foo@example.com" message_id="bar1234@mail.example.com" reason="no reason"\n'
+    assert res.stdout == 'PenaltyBox: Record: remote_ip=10.11.112.113 mail_from="foo@example.com" message_id="bar1234@mail.example.com" env=689361A2.1B2032DC.DEAD60ff.655321 reason="no reason"\n'
 
 
 def test_window(run_penaltybox):
     assert run_penaltybox().returncode == 1
     res = run_penaltybox()
     assert res.returncode == 1
-    assert res.stdout == 'PenaltyBox: Window: elapsed=0s remote_ip=10.11.112.113 mail_from="foo@example.com" message_id="bar1234@mail.example.com" reason="no reason"\n'
+    assert res.stdout == 'PenaltyBox: Window: elapsed=0s remote_ip=10.11.112.113 mail_from="foo@example.com" message_id="bar1234@mail.example.com" env=689361A2.1B2032DC.DEAD60ff.655321 reason="no reason"\n'
 
 
 @pytest.mark.parametrize('ip', [
@@ -54,7 +55,7 @@ def test_accept(run_penaltybox, ip):
     time.sleep(2)
     res = run_penaltybox(ip=ip)
     assert res.returncode == 0
-    assert res.stdout == f'PenaltyBox: Accept: elapsed=2s remote_ip={ip} mail_from="foo@example.com" message_id="bar1234@mail.example.com" reason="no reason"\n'
+    assert res.stdout == f'PenaltyBox: Accept: elapsed=2s remote_ip={ip} mail_from="foo@example.com" message_id="bar1234@mail.example.com" env=689361A2.1B2032DC.DEAD60ff.655321 reason="no reason"\n'
 
 
 @pytest.mark.parametrize('ips', [

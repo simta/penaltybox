@@ -30,6 +30,7 @@ main(int ac, char *av[]) {
     char       *cksum;
     char       *from;
     char       *message_id;
+    char       *env_id;
     char       *prefix = PENALTYBOX_PREFIX;
     char       *reason;
     char       *subnet;
@@ -110,6 +111,10 @@ main(int ac, char *av[]) {
         fprintf(stderr, "SIMTA_MID not set\n");
         exit(MESSAGE_ACCEPT);
     }
+    if ((env_id = getenv("SIMTA_UID")) == NULL) {
+        fprintf(stderr, "SIMTA_UID (envelope id) not set\n");
+        exit(MESSAGE_ACCEPT);
+    }
 
     if ((urc = urcl_connect(redis_host, redis_port)) == NULL) {
         fprintf(stderr, "Unable to connect to %s:%d\n", redis_host, redis_port);
@@ -120,7 +125,7 @@ main(int ac, char *av[]) {
     msg_info = yaslcatrepr(msg_info, from, strlen(from));
     msg_info = yaslcat(msg_info, " message_id=");
     msg_info = yaslcatrepr(msg_info, message_id, strlen(message_id));
-    msg_info = yaslcat(msg_info, " reason=");
+    msg_info = yaslcatprintf(msg_info, " env=%s reason=", env_id);
     msg_info = yaslcatrepr(msg_info, reason, strlen(reason));
 
     ht_key = yaslcatprintf(yaslauto(prefix), ":hattrick:%s", ip);
