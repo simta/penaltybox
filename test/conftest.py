@@ -16,7 +16,7 @@ def openport(port):
             socket.create_connection(('localhost', port), 0.1)
             port += 1
             if port > 65535:
-                raise ValueError("exhausted TCP port range without finding a free one")
+                raise ValueError('exhausted TCP port range without finding a free one')
         except socket.error:
             return port
 
@@ -46,7 +46,7 @@ def redis():
                 raise
             time.sleep(0.1)
 
-    yield(port)
+    yield port
 
     if redis_proc:
         redis_proc.terminate()
@@ -58,4 +58,5 @@ def tool_path(scope='session'):
         binpath = os.path.dirname(os.path.realpath(__file__))
         binpath = os.path.join(binpath, '..', tool)
         return os.path.realpath(binpath)
+
     return _tool_path

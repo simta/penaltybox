@@ -20,8 +20,10 @@ def run_ipthrottle(tool_path, redis):
         res = subprocess.run(
             [
                 tool_path('ipthrottle'),
-                '-p', str(redis),
-                '-d', 'example.com',
+                '-p',
+                str(redis),
+                '-d',
+                'example.com',
             ],
             check=True,
             capture_output=True,
@@ -30,6 +32,7 @@ def run_ipthrottle(tool_path, redis):
         )
 
         return res.stdout.strip()
+
     return _run_ipthrottle
 
 

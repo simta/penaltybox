@@ -21,8 +21,10 @@ def run_userthrottle(tool_path, redis):
         res = subprocess.run(
             [
                 tool_path('userthrottle'),
-                '-p', str(redis),
-                '-d', 'example.com',
+                '-p',
+                str(redis),
+                '-d',
+                'example.com',
             ],
             env=env,
             check=True,
@@ -31,6 +33,7 @@ def run_userthrottle(tool_path, redis):
         )
 
         return res.stdout.strip()
+
     return _run_userthrottle
 
 
